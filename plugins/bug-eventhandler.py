@@ -327,7 +327,7 @@ def bugbot_sendtext(message):
 def bugbot_sendjson(json_text):
     message = json.loads(json_text)
     channel = message['channel']
-    if message['url']:
+    if 'url' in message:
         text = '{}: <{}|{}>'.format(message['type_readable'], message['url'], message['text'])
     else:
         text = '{}: {}'.format(message['type_readable'], message['text'])
