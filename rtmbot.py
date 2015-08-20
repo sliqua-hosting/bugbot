@@ -10,13 +10,15 @@ import os
 import sys
 import time
 import logging
+import threading
+from threading import Thread
 from argparse import ArgumentParser
 
 from slackclient import SlackClient
 
 def dbg(debug_string):
     if debug:
-        logging.info(debug_string)
+        logging.debug(debug_string)
 
 class RtmBot(object):
     def __init__(self, token):
@@ -65,36 +67,46 @@ class RtmBot(object):
                     limiter = True
     def crons(self):
         for plugin in self.bot_plugins:
-            plugin.do_jobs()
+            if plugin.is_alive():
+                plugin.do_jobs()
     def load_plugins(self):
         for plugin in glob.glob(directory+'/plugins/*'):
             sys.path.insert(0, plugin)
             sys.path.insert(0, directory+'/plugins/')
         for plugin in glob.glob(directory+'/plugins/*.py') + glob.glob(directory+'/plugins/*/*.py'):
-            logging.info(plugin)
+            logging.debug(plugin)
             name = plugin.split('/')[-1][:-3]
 #            try:
-            self.bot_plugins.append(Plugin(name))
+            plugin_object = Plugin(name, self)
+            plugin_object.start()
+            self.bot_plugins.append(plugin_object)
 #            except:
 #                print "error loading plugin %s" % name
 
-class Plugin(object):
-    def __init__(self, name, plugin_config={}):
+class Plugin(threading.Thread):
+    def __init__(self, name, parent):
+        Thread.__init__(self)
+        self.parent = parent
         self.name = name
         self.jobs = []
         self.module = __import__(name)
-        self.register_jobs()
         self.outputs = []
+        self.module.parent = parent
+        self.daemon = True
         if name in config:
             logging.info("config found for: " + name)
             self.module.config = config[name]
+
+    def run(self):
         if 'setup' in dir(self.module):
-            self.module.setup()
+            self.module.setup(self)
+        self.register_jobs()
+
     def register_jobs(self):
         if 'crontable' in dir(self.module):
             for interval, function in self.module.crontable:
                 self.jobs.append(Job(interval, eval("self.module."+function)))
-            logging.info(self.module.crontable)
+            logging.debug(self.module.crontable)
             self.module.crontable = []
         else:
             self.module.crontable = []
@@ -156,8 +168,14 @@ class UnknownChannel(Exception):
 
 def main_loop():
     if "LOGFILE" in config:
-        logging.basicConfig(filename=config["LOGFILE"], level=logging.INFO, format='%(asctime)s %(message)s')
-    logging.info(directory)
+        logging.basicConfig(filename=config["LOGFILE"], level=logging.INFO, format='%(asctime)s [%(levelname)s] %(name)s: %(message)s')
+        console = logging.StreamHandler()
+        console.setLevel(logging.DEBUG)
+      
+        formatter = logging.Formatter('%(name)-20s: %(levelname)-8s %(message)s')
+        console.setFormatter(formatter)
+        logging.getLogger('').addHandler(console)
+    logging.debug(directory)
     try:
         bot.start()
     except KeyboardInterrupt:
