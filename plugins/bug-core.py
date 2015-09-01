@@ -1,5 +1,7 @@
 import time
 import logging
+import json
+import re
 
 crontable = []
 outputs = []
@@ -22,7 +24,7 @@ def process_message(data):
         outputs.append([ data['channel'], '_wags tail_'])
     elif text.startswith('pushes') and 'bug to' in text:
         LOGGER.info('Command received: %s', text)
-        user = text.split()[3]
+        user = get_username(text.split()[3])
         if user:
             outputs.append([ data['channel'], '_wanders over to {}_'.format(user) ])
     elif text.startswith('bug:'):
@@ -46,3 +48,19 @@ def user_is_bot(uid):
     else:
         return False
 
+def get_username(uid):
+    LOGGER.info(uid)
+    try:
+        uid = re.search('^<@(.+?)\|', uid).group(1).upper()
+        LOGGER.info(uid)
+    except AttributeError:
+        LOGGER.debug('Failed RegEx search, using literal input')    
+    reply = parent.slack_client.api_call('users.info', user=uid)
+    LOGGER.info(reply)
+    user_data = json.loads(reply)
+    user = None
+    if user_data['ok'] and 'name' in user_data['user']:
+        user = user_data['user']
+        return user['name']
+    else:
+        return uid
