@@ -51,7 +51,7 @@ def user_is_bot(uid):
 def get_username(uid):
     LOGGER.info(uid)
     try:
-        uid = re.search('^<@(.+?)\|', uid).group(1).upper()
+        uid = re.search('^<@(.+?)[|>]', uid).group(1).upper()
         LOGGER.info(uid)
     except AttributeError:
         LOGGER.debug('Failed RegEx search, using literal input')    
