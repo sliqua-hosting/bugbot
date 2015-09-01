@@ -8,9 +8,13 @@ parent = None
 LOGGER = logging.getLogger(__name__)
 
 def process_message(data):
-    text = data['text'].lower()
+    if 'text' in data:
+        text = data['text'].lower()
+    else:
+        text = None
+
     LOGGER.debug(data)
-    if data['subtype'] and (data['subtype'] == 'bot_message' or data['user'] == 'U02NTS39B'):
+    if 'subtype' in data and (data['subtype'] == 'bot_message' or data['user'] == 'U02NTS39B'):
         LOGGER.info('I hate bots!')
         outputs.append([ data['channel'], '_growls_'])
     if text.startswith('pets') and 'bug' in text:
